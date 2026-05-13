@@ -81,9 +81,14 @@ function buildShell() {
                 Your code never leaves the browser.
               </div>
               <div class="welcome-screen__shortcuts">
-                <div class="welcome-screen__shortcut"><kbd>Ctrl+B</kbd> Toggle sidebar</div>
+                <div class="welcome-screen__shortcut"><kbd>Ctrl+Shift+P</kbd> Command Palette</div>
+                <div class="welcome-screen__shortcut"><kbd>Ctrl+K</kbd> Quick AI Action</div>
                 <div class="welcome-screen__shortcut"><kbd>Ctrl+Shift+A</kbd> Toggle AI panel</div>
+                <div class="welcome-screen__shortcut"><kbd>Ctrl+B</kbd> Toggle sidebar</div>
                 <div class="welcome-screen__shortcut"><kbd>Ctrl+\`</kbd> Toggle terminal</div>
+                <div class="welcome-screen__shortcut" style="margin-top:8px; color:var(--accent-secondary)">
+                  Select code → Inline actions (Explain, Fix, Refactor)
+                </div>
               </div>
             </div>
           </div>
