@@ -411,10 +411,30 @@ export class ChatPanel {
 
   // ---- Autonomous Agent ----
   async _runAutonomousAgent(task, ctx) {
+    let currentTextEl = null;
+
     const agent = new LocalAgentFramework((event) => {
       // Handle UI updates from the agent framework
       if (event.type === 'status' || event.type === 'system') {
         this._addRawMessage('ai', `<em>${event.message}</em>`);
+        currentTextEl = null;
+      } else if (event.type === 'token') {
+        if (!currentTextEl) {
+          const msgContainer = this.container.querySelector('#chat-messages');
+          const div = document.createElement('div');
+          div.className = 'chat-msg';
+          div.innerHTML = `
+            <div class="chat-msg__avatar chat-msg__avatar--ai">✦</div>
+            <div class="chat-msg__body">
+              <div class="chat-msg__name">🤖 Agent</div>
+              <div class="chat-msg__text"></div>
+            </div>
+          `;
+          msgContainer.appendChild(div);
+          currentTextEl = div.querySelector('.chat-msg__text');
+        }
+        currentTextEl.innerHTML = this._formatMarkdown(event.text);
+        this._scrollToBottom();
       } else if (event.type === 'tool_call') {
         const details = Object.entries(event.tool).filter(([k,v]) => k !== 'name' && v).map(([k,v]) => `<strong>${k}:</strong><br><pre>${this._formatMarkdown(v)}</pre>`).join('');
         this._addRawMessage('ai', `<div style="border-left: 3px solid var(--accent-primary); padding-left: 8px; margin-top: 8px;">

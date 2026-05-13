@@ -121,7 +121,7 @@ class AIEngine {
 
       const options = {
         baseOptions: {},
-        maxTokens: 2048,
+        maxTokens: 4096,
         topK: 40,
         temperature: 0.7,
         randomSeed: 42,

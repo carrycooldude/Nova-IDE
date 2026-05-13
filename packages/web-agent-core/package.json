@@ -1,0 +1,26 @@
+{
+  "name": "@nova-ide/web-agent-core",
+  "version": "1.0.0",
+  "description": "A purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct Agent Framework.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carrycooldude/Nova-IDE.git"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "webgpu",
+    "mediapipe",
+    "react",
+    "autonomous",
+    "browser",
+    "local-first"
+  ],
+  "author": "Nova IDE Team",
+  "license": "MIT"
+}
