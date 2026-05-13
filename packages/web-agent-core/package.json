@@ -1,5 +1,5 @@
 {
-  "name": "@nova-ide/web-agent-core",
+  "name": "nova-web-agent-core",
   "version": "1.0.0",
   "description": "A purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct Agent Framework.",
   "main": "src/index.js",
