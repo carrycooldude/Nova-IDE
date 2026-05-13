@@ -15,6 +15,29 @@ This package provides a purely in-browser, WebGPU-accelerated, zero-dependency a
 - **Pluggable Tools**: Give your agent the ability to execute any javascript function (file system access, fetch, DOM manipulation).
 - **XML-First Parsing**: Optimized for smaller models (2B-8B parameters) that handle XML tags better than JSON or Markdown parsing.
 
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent as WebAgent Core
+    participant LLM as Local LLM Engine
+    participant Tools as Pluggable Tools (VFS, etc)
+
+    User->>Agent: Run Task ("Summarize index.js")
+    loop ReAct Loop
+        Agent->>LLM: Generate raw tokens (inject System Prompt + History)
+        LLM-->>Agent: Output <tool_call> block
+        Agent->>Agent: Parse XML
+        Agent->>Tools: Execute requested Tool (e.g., read_file)
+        Tools-->>Agent: Return Tool Result
+        Agent->>Agent: Append result to history
+    end
+    Agent->>LLM: Final prompt (Result analysis)
+    LLM-->>Agent: Output <finish> block
+    Agent-->>User: Task Complete
+```
+
 ## Installation
 
 Install the core package using NPM:
