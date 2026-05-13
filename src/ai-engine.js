@@ -19,6 +19,48 @@ class AIEngine {
     this.statusMessage = 'No model loaded';
     this.listeners = new Set();
     this.modelName = 'Local AI Engine';
+    this._opfsRoot = null;
+  }
+
+  async _getOpfs() {
+    if (!this._opfsRoot) {
+      this._opfsRoot = await navigator.storage.getDirectory();
+    }
+    return this._opfsRoot;
+  }
+
+  /** Check if a model exists in OPFS cache */
+  async getCachedModel(filename) {
+    try {
+      const root = await this._getOpfs();
+      const fileHandle = await root.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      return file;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Save a buffer to OPFS cache */
+  async saveToCache(filename, buffer) {
+    try {
+      const root = await this._getOpfs();
+      const fileHandle = await root.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(buffer);
+      await writable.close();
+      console.log(`[AIEngine] Saved ${filename} to OPFS cache`);
+    } catch (err) {
+      console.error('[AIEngine] OPFS save error:', err);
+    }
+  }
+
+  /** Delete a model from OPFS cache */
+  async deleteFromCache(filename) {
+    try {
+      const root = await this._getOpfs();
+      await root.removeEntry(filename);
+    } catch (e) {}
   }
 
   /** Subscribe to status changes */
@@ -168,10 +210,23 @@ ${userMessage}<end_of_turn>
   /**
    * Download a model from a URL with progress tracking, then load it.
    * @param {string} url - Direct download URL
+   * @param {boolean} persist - Whether to save to OPFS
    * @param {(received: number, total: number) => void} onProgress
    */
-  async downloadAndLoad(url, onProgress) {
+  async downloadAndLoad(url, persist, onProgress) {
     try {
+      const filename = url.split('/').pop();
+
+      // Check cache first if persist is requested
+      if (persist) {
+        const cached = await this.getCachedModel(filename);
+        if (cached) {
+          this._setStatus(MODEL_STATUS.LOADING, 'Loading from local disk…');
+          await this.loadModel(cached);
+          return;
+        }
+      }
+
       this._setStatus(MODEL_STATUS.DOWNLOADING, 'Connecting…');
 
       const response = await fetch(url);
@@ -205,7 +260,13 @@ ${userMessage}<end_of_turn>
       }
 
       const filename = url.split('/').pop();
-      await this.loadModel(new File([buffer], filename));
+      const file = new File([buffer], filename);
+
+      if (persist) {
+        await this.saveToCache(filename, buffer);
+      }
+
+      await this.loadModel(file);
     } catch (err) {
       console.error('[AIEngine] Download error:', err);
       this._setStatus(MODEL_STATUS.ERROR, `Download failed: ${err.message}`);

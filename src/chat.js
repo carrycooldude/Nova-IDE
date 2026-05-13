@@ -72,8 +72,14 @@ export class ChatPanel {
         <div class="model-status__row" style="margin-top: 4px;">
           <button class="model-status__btn model-status__btn--primary" id="model-quickload-btn"
             style="width: 100%; padding: 8px 14px; font-size: 13px;">
-            ⬇ Download Gemma 4 E2B (2 GB)
+            ⬇ Download Model
           </button>
+        </div>
+        <div class="model-status__row" style="margin-top: 4px; gap: 6px;">
+          <input type="checkbox" id="model-persist-check" style="cursor: pointer;">
+          <label for="model-persist-check" style="font-size: 11px; color: var(--text-secondary); cursor: pointer;">
+            Save to local disk (OPFS)
+          </label>
         </div>
         <div class="model-status__progress hidden" id="model-progress">
           <div class="model-status__progress-bar" id="model-progress-bar" style="width: 0%"></div>
@@ -144,12 +150,21 @@ export class ChatPanel {
 
   _bindEvents() {
     // Model selector + download
-    const quickloadBtn = this.container.querySelector('#model-quickload-btn');
     const modelSelect = this.container.querySelector('#model-select');
+    const persistCheck = this.container.querySelector('#model-persist-check');
+    const quickloadBtn = this.container.querySelector('#model-quickload-btn');
 
-    const updateBtnLabel = () => {
+    const updateBtnLabel = async () => {
       const model = MODELS.find(m => m.id === modelSelect.value) || MODELS.find(m => m.id === DEFAULT_MODEL_ID);
-      quickloadBtn.textContent = `⬇ Download ${model.label} (${model.size})`;
+      const filename = model.url.split('/').pop();
+      const cached = await aiEngine.getCachedModel(filename);
+
+      if (cached) {
+        quickloadBtn.innerHTML = `⚡ Load ${model.label} from Local Disk`;
+        persistCheck.checked = true;
+      } else {
+        quickloadBtn.innerHTML = `⬇ Download ${model.label} (${model.size})`;
+      }
     };
     updateBtnLabel();
 
@@ -168,7 +183,8 @@ export class ChatPanel {
       progressLabel.textContent = 'Starting download…';
 
       try {
-        await aiEngine.downloadAndLoad(model.url, (received, total) => {
+        const persist = persistCheck.checked;
+        await aiEngine.downloadAndLoad(model.url, persist, (received, total) => {
           if (total > 0) {
             const pct = Math.round((received / total) * 100);
             progressBar.style.width = `${pct}%`;
@@ -179,6 +195,7 @@ export class ChatPanel {
         });
         progressDiv.classList.add('hidden');
         progressText.classList.add('hidden');
+        updateBtnLabel(); // Refresh label to show it's cached
       } catch (err) {
         progressDiv.classList.add('hidden');
         progressText.classList.add('hidden');
