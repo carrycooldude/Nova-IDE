@@ -8,6 +8,20 @@ import { vfs } from './file-system.js';
 
 const MODELS = [
   {
+    id: 'gemma3-1b-int4',
+    label: 'Gemma 3 1B · int4',
+    size: '700 MB',
+    badge: '⚡ Fastest',
+    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4-web.task',
+  },
+  {
+    id: 'gemma3-1b-int8',
+    label: 'Gemma 3 1B · int8',
+    size: '1 GB',
+    badge: '',
+    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int8-web.task',
+  },
+  {
     id: 'gemma4-e2b',
     label: 'Gemma 4 E2B',
     size: '2 GB',
