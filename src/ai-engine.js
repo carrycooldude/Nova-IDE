@@ -165,6 +165,54 @@ ${userMessage}<end_of_turn>
     return this.status === MODEL_STATUS.GENERATING;
   }
 
+  /**
+   * Download a model from a URL with progress tracking, then load it.
+   * @param {string} url - Direct download URL
+   * @param {(received: number, total: number) => void} onProgress
+   */
+  async downloadAndLoad(url, onProgress) {
+    try {
+      this._setStatus(MODEL_STATUS.DOWNLOADING, 'Connecting…');
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+
+      const total = parseInt(response.headers.get('content-length') || '0');
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (onProgress) onProgress(received, total);
+        this._setStatus(
+          MODEL_STATUS.DOWNLOADING,
+          total
+            ? `Downloading… ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`
+            : `Downloading… ${(received / 1048576).toFixed(0)} MB`
+        );
+      }
+
+      // Concatenate chunks into a single buffer
+      const buffer = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) {
+        buffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const filename = url.split('/').pop();
+      await this.loadModel(new File([buffer], filename));
+    } catch (err) {
+      console.error('[AIEngine] Download error:', err);
+      this._setStatus(MODEL_STATUS.ERROR, `Download failed: ${err.message}`);
+      throw err;
+    }
+  }
+
   dispose() {
     if (this.llmInference) {
       this.llmInference.close();
