@@ -50,6 +50,7 @@ export class Terminal {
         e.preventDefault();
         const cmd = input.value.trim();
         input.disabled = true;
+        input.removeAttribute('id');
         if (cmd) {
           this.history.push(cmd);
           this.historyIndex = this.history.length;
