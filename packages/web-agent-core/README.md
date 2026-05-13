@@ -1,4 +1,4 @@
-# local-web-agent-core
+# nova-web-agent-core
 
 A purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct (Reason+Act) Agent Framework.
 
@@ -13,13 +13,13 @@ Built for local-first, privacy-respecting AI applications using MediaPipe GenAI 
 ## Installation
 
 ```bash
-npm install local-web-agent-core
+npm install nova-web-agent-core
 ```
 
 ## Quick Start
 
 ```javascript
-import { WebAgent } from 'local-web-agent-core';
+import { WebAgent } from 'nova-web-agent-core';
 
 // 1. Define your custom tools
 const myTools = [
