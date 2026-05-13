@@ -1,0 +1,106 @@
+{
+  "hash": "2a18d618",
+  "configHash": "acf33468",
+  "lockfileHash": "bd051614",
+  "browserHash": "e19e2723",
+  "optimized": {
+    "@codemirror/autocomplete": {
+      "src": "../../node_modules/@codemirror/autocomplete/dist/index.js",
+      "file": "@codemirror_autocomplete.js",
+      "fileHash": "245eae64",
+      "needsInterop": false
+    },
+    "@codemirror/commands": {
+      "src": "../../node_modules/@codemirror/commands/dist/index.js",
+      "file": "@codemirror_commands.js",
+      "fileHash": "7f879f02",
+      "needsInterop": false
+    },
+    "@codemirror/lang-css": {
+      "src": "../../node_modules/@codemirror/lang-css/dist/index.js",
+      "file": "@codemirror_lang-css.js",
+      "fileHash": "b99d5846",
+      "needsInterop": false
+    },
+    "@codemirror/lang-html": {
+      "src": "../../node_modules/@codemirror/lang-html/dist/index.js",
+      "file": "@codemirror_lang-html.js",
+      "fileHash": "7b759cd9",
+      "needsInterop": false
+    },
+    "@codemirror/lang-javascript": {
+      "src": "../../node_modules/@codemirror/lang-javascript/dist/index.js",
+      "file": "@codemirror_lang-javascript.js",
+      "fileHash": "aa887917",
+      "needsInterop": false
+    },
+    "@codemirror/lang-python": {
+      "src": "../../node_modules/@codemirror/lang-python/dist/index.js",
+      "file": "@codemirror_lang-python.js",
+      "fileHash": "fa95765f",
+      "needsInterop": false
+    },
+    "@codemirror/language": {
+      "src": "../../node_modules/@codemirror/language/dist/index.js",
+      "file": "@codemirror_language.js",
+      "fileHash": "e87c14cb",
+      "needsInterop": false
+    },
+    "@codemirror/search": {
+      "src": "../../node_modules/@codemirror/search/dist/index.js",
+      "file": "@codemirror_search.js",
+      "fileHash": "8fff8ee7",
+      "needsInterop": false
+    },
+    "@codemirror/state": {
+      "src": "../../node_modules/@codemirror/state/dist/index.js",
+      "file": "@codemirror_state.js",
+      "fileHash": "7f4945c8",
+      "needsInterop": false
+    },
+    "@codemirror/theme-one-dark": {
+      "src": "../../node_modules/@codemirror/theme-one-dark/dist/index.js",
+      "file": "@codemirror_theme-one-dark.js",
+      "fileHash": "336c2c22",
+      "needsInterop": false
+    },
+    "@codemirror/view": {
+      "src": "../../node_modules/@codemirror/view/dist/index.js",
+      "file": "@codemirror_view.js",
+      "fileHash": "036fa8cb",
+      "needsInterop": false
+    },
+    "@mediapipe/tasks-genai": {
+      "src": "../../node_modules/@mediapipe/tasks-genai/genai_bundle.mjs",
+      "file": "@mediapipe_tasks-genai.js",
+      "fileHash": "8e2bf740",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "dist-BZv6c9Y-": {
+      "file": "dist-BZv6c9Y-.js",
+      "isDynamicEntry": false
+    },
+    "dist-CJ3dJb85": {
+      "file": "dist-CJ3dJb85.js",
+      "isDynamicEntry": false
+    },
+    "dist-CLZolQMB": {
+      "file": "dist-CLZolQMB.js",
+      "isDynamicEntry": false
+    },
+    "dist-CamJ8SlV": {
+      "file": "dist-CamJ8SlV.js",
+      "isDynamicEntry": false
+    },
+    "dist-D9-IY-HS": {
+      "file": "dist-D9-IY-HS.js",
+      "isDynamicEntry": false
+    },
+    "dist-Hef7Z_Rg": {
+      "file": "dist-Hef7Z_Rg.js",
+      "isDynamicEntry": false
+    }
+  }
+}

@@ -1,12 +1,13 @@
 /**
  * main.js — Nova IDE application bootstrap.
- * Wires together: file system, editor, chat panel, terminal.
+ * Wires together: file system, editor, chat panel, terminal, agent.
  */
 import './style.css';
 import { vfs } from './file-system.js';
 import { createEditor, destroyEditor } from './editor.js';
 import { ChatPanel } from './chat.js';
 import { Terminal } from './terminal.js';
+import { CommandPalette, InlineActions, editorContext } from './agent.js';
 
 // ---- State ----
 let currentFile = null;
@@ -260,6 +261,20 @@ function openFile(path) {
     }
   });
 
+  // Update agent context bridge
+  editorContext.getView = () => editorView;
+  editorContext.getCurrentFile = () => currentFile;
+  editorContext.getSelection = () => {
+    if (!editorView) return '';
+    const sel = editorView.state.selection.main;
+    return editorView.state.sliceDoc(sel.from, sel.to);
+  };
+  editorContext.getFileContent = () => editorView ? editorView.state.doc.toString() : '';
+  editorContext.getCursorLine = () => {
+    if (!editorView) return 1;
+    return editorView.state.doc.lineAt(editorView.state.selection.main.head).number;
+  };
+
   // Update status bar
   document.getElementById('sb-lang').textContent = file.language;
   document.getElementById('sb-cursor').textContent = 'Ln 1, Col 1';
@@ -336,6 +351,10 @@ async function init() {
 
   // Init terminal
   const terminal = new Terminal(document.getElementById('terminal-container'));
+
+  // Init agentic features
+  const commandPalette = new CommandPalette();
+  const inlineActions = new InlineActions();
 
   // Bind activity bar buttons
   document.getElementById('act-explorer').addEventListener('click', toggleSidebar);
