@@ -62,12 +62,12 @@ INSTRUCTIONS:
 
   async _executeTool(args) {
     const tool = this.tools.find(t => t.name === args.name);
-    if (!tool) return \`Error: Tool "\${args.name}" not found.\`;
+    if (!tool) return `Error: Tool "${args.name}" not found.`;
 
     try {
       return await tool.execute(args);
     } catch (e) {
-      return \`Error executing tool \${args.name}: \${e.message}\`;
+      return `Error executing tool ${args.name}: ${e.message}`;
     }
   }
 
@@ -76,15 +76,15 @@ INSTRUCTIONS:
    * @param {string} userTask 
    */
   async run(userTask) {
-    let history = \`<start_of_turn>user\\n\${this._buildSystemPrompt()}\\n\\nTask: \${userTask}<end_of_turn>\\n\`;
+    let history = `<start_of_turn>user\n${this._buildSystemPrompt()}\n\nTask: ${userTask}<end_of_turn>\n`;
     let stepCount = 0;
 
     while (stepCount < this.maxSteps) {
       stepCount++;
-      this.ui({ type: 'status', message: \`Agent Thinking (Step \${stepCount})...\` });
+      this.ui({ type: 'status', message: `Agent Thinking (Step ${stepCount})...` });
 
       // Start Model Turn
-      history += \`<start_of_turn>model\\n\`;
+      history += `<start_of_turn>model\n`;
       let currentResponse = '';
 
       // Generate response from local LLM
@@ -93,21 +93,21 @@ INSTRUCTIONS:
         this.ui({ type: 'token', text: partial });
       });
 
-      history += \`\${currentResponse}<end_of_turn>\\n\`;
+      history += `${currentResponse}<end_of_turn>\n`;
 
       // Check for tool calls
       const toolCall = this._parseToolCall(currentResponse);
       
       if (!toolCall) {
-        this.ui({ type: 'system', message: \`⚠️ Agent didn't call a tool. Reminding it to act or finish.\` });
-        history += \`<start_of_turn>user\\nPlease use a <tool_call> XML block to take action, or use the 'finish' tool if you are done.<end_of_turn>\\n\`;
+        this.ui({ type: 'system', message: `⚠️ Agent didn't call a tool. Reminding it to act or finish.` });
+        history += `<start_of_turn>user\nPlease use a <tool_call> XML block to take action, or use the 'finish' tool if you are done.<end_of_turn>\n`;
         continue;
       }
 
       this.ui({ type: 'tool_call', tool: toolCall });
 
       if (toolCall.name === 'finish') {
-        this.ui({ type: 'system', message: \`✅ Agent finished the task.\` });
+        this.ui({ type: 'system', message: `✅ Agent finished the task.` });
         break;
       }
 
@@ -116,11 +116,11 @@ INSTRUCTIONS:
       this.ui({ type: 'tool_result', result: result, tool: toolCall });
 
       // Append result to history for next turn
-      history += \`<start_of_turn>user\\n<tool_result>\\n\${result}\\n</tool_result>\\n\\nAnalyze the result and take your next step using a <tool_call> block.<end_of_turn>\\n\`;
+      history += `<start_of_turn>user\n<tool_result>\n${result}\n</tool_result>\n\nAnalyze the result and take your next step using a <tool_call> block.<end_of_turn>\n`;
     }
 
     if (stepCount >= this.maxSteps) {
-      this.ui({ type: 'system', message: \`🛑 Agent stopped (max steps reached).\` });
+      this.ui({ type: 'system', message: `🛑 Agent stopped (max steps reached).` });
     }
   }
 }
