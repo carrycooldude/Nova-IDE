@@ -4,6 +4,7 @@
  */
 import { aiEngine, MODEL_STATUS } from './ai-engine.js';
 import { setChatDispatcher, gatherContext, computeDiff, renderDiffHTML, editorContext } from './agent.js';
+import { LocalAgentFramework } from './agent-framework.js';
 import { vfs } from './file-system.js';
 
 const MODELS = [
@@ -332,7 +333,17 @@ export class ChatPanel {
     const ctx = this._attachedContext || gatherContext();
 
     if (this.agentMode) {
-      enrichedPrompt = this._buildAgentPrompt(text, ctx);
+      this._addMessage('user', text, ctx);
+      this.container.querySelector('#context-bar').classList.add('hidden');
+      this._attachedContext = null;
+
+      if (!aiEngine.isReady) {
+        this._addMessage('ai', '⚠️ Please load a model first using the panel above.');
+        return;
+      }
+      
+      await this._runAutonomousAgent(text, ctx);
+      return;
     } else if (ctx.selection) {
       enrichedPrompt = `Context — File: ${ctx.fileName} (${ctx.language})\nSelected code:\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\`\n\nUser request: ${text}`;
     } else if (ctx.fileContent) {
@@ -398,25 +409,31 @@ export class ChatPanel {
     }
   }
 
-  _buildAgentPrompt(task, ctx) {
-    const fileList = ctx.allFiles.join('\n  ');
-    return `You are an AI coding agent inside an IDE. You can read and modify files.
+  // ---- Autonomous Agent ----
+  async _runAutonomousAgent(task, ctx) {
+    const agent = new LocalAgentFramework((event) => {
+      // Handle UI updates from the agent framework
+      if (event.type === 'status' || event.type === 'system') {
+        this._addRawMessage('ai', `<em>${event.message}</em>`);
+      } else if (event.type === 'tool_call') {
+        const details = Object.entries(event.tool).filter(([k,v]) => k !== 'name' && v).map(([k,v]) => `<strong>${k}:</strong><br><pre>${this._formatMarkdown(v)}</pre>`).join('');
+        this._addRawMessage('ai', `<div style="border-left: 3px solid var(--accent-primary); padding-left: 8px; margin-top: 8px;">
+          <strong>⚙️ Tool Call:</strong> <code>${event.tool.name}</code><br>
+          ${details}
+        </div>`);
+      } else if (event.type === 'tool_result') {
+        this._addRawMessage('ai', `<div style="border-left: 3px solid #10b981; padding-left: 8px; margin-top: 8px;">
+          <strong>✅ Result:</strong><br>
+          <pre style="max-height: 100px; overflow-y: auto; font-size: 10px;">${this._formatMarkdown(event.result)}</pre>
+        </div>`);
+      }
+    });
 
-Workspace files:
-  ${fileList}
-
-Current file: ${ctx.fileName} (${ctx.language})
-Cursor line: ${ctx.cursorLine}
-${ctx.selection ? `Selected code:\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\`` : ''}
-
-Task: ${task}
-
-Respond with a structured plan:
-1. List the steps you will take
-2. For each step, show the code changes in a code block
-3. Explain your reasoning
-
-Use code blocks with the target filename as a comment on the first line.`;
+    try {
+      await agent.runAgentLoop(task, ctx.allFiles);
+    } catch (err) {
+      this._addMessage('ai', `❌ Agent crashed: ${err.message}`);
+    }
   }
 
   // ---- Apply Code to Editor ----

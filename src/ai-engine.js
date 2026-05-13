@@ -188,6 +188,35 @@ class AIEngine {
   }
 
   /**
+   * Generate a response using raw formatted string (for multi-turn/agents).
+   */
+  async generateRaw(rawPrompt, onToken) {
+    if (!this.llmInference) throw new Error('Model not loaded');
+    this._setStatus(MODEL_STATUS.GENERATING, 'Agent thinking…');
+
+    try {
+      let fullResponse = '';
+      const response = await this.llmInference.generateResponse(
+        rawPrompt,
+        (partialResult, done) => {
+          fullResponse = partialResult;
+          if (onToken) onToken(partialResult);
+        }
+      );
+      if (!fullResponse && response) {
+        fullResponse = response;
+        if (onToken) onToken(response);
+      }
+      this._setStatus(MODEL_STATUS.READY, 'Model ready — on-device inference active');
+      return fullResponse;
+    } catch (err) {
+      console.error('[AIEngine] Raw generation error:', err);
+      this._setStatus(MODEL_STATUS.READY, 'Generation completed with errors');
+      throw err;
+    }
+  }
+
+  /**
    * Format prompt using instruction template.
    */
   _formatPrompt(userMessage) {
