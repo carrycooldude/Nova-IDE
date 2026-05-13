@@ -68,5 +68,17 @@ Nova IDE is a lightweight, browser-based coding environment designed for the fut
 
 MIT License. See [LICENSE](LICENSE) for details.
 
+
+
+https://github.com/user-attachments/assets/989acde6-957d-4df2-8cf0-cf3365810489
+
+
+
+https://github.com/user-attachments/assets/169f3cc4-37b6-48e8-9371-f051bc7a43cd
+
+
+
 ---
 *Powered by On-Device AI.*
+
+
