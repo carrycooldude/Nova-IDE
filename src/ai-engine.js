@@ -259,7 +259,6 @@ ${userMessage}<end_of_turn>
         offset += chunk.length;
       }
 
-      const filename = url.split('/').pop();
       const file = new File([buffer], filename);
 
       if (persist) {
