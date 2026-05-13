@@ -36,6 +36,7 @@ ${toolDocs}
 INSTRUCTIONS:
 - You MUST use the exact <tool_call> XML format shown above to take an action.
 - You can only use ONE tool per response.
+- BE EXTREMELY CONCISE. Keep your reasoning to 1-2 sentences maximum before calling a tool. Do not write long paragraphs of analysis.
 - After you output a <tool_call>, STOP generating. The system will execute the tool and provide you with the <tool_result>.`;
   }
 
