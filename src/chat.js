@@ -6,6 +6,39 @@ import { aiEngine, MODEL_STATUS } from './ai-engine.js';
 import { setChatDispatcher, gatherContext, computeDiff, renderDiffHTML, editorContext } from './agent.js';
 import { vfs } from './file-system.js';
 
+const MODELS = [
+  {
+    id: 'gemma3-1b-int4',
+    label: 'Gemma 3 1B · int4',
+    size: '700 MB',
+    badge: '⚡ Fastest',
+    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4-web.task',
+  },
+  {
+    id: 'gemma3-1b-int8',
+    label: 'Gemma 3 1B · int8',
+    size: '1 GB',
+    badge: '',
+    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int8-web.task',
+  },
+  {
+    id: 'gemma4-e2b',
+    label: 'Gemma 4 E2B',
+    size: '2 GB',
+    badge: '★ Recommended',
+    url: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task',
+  },
+  {
+    id: 'gemma4-e4b',
+    label: 'Gemma 4 E4B',
+    size: '3 GB',
+    badge: '🔥 Best',
+    url: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.task',
+  },
+];
+
+const DEFAULT_MODEL_ID = 'gemma4-e2b';
+
 export class ChatPanel {
   constructor(container) {
     this.container = container;
@@ -39,18 +72,28 @@ export class ChatPanel {
           <span class="model-status__label" id="model-status-text">No model loaded</span>
         </div>
         <div class="model-status__row" style="margin-top: 4px;">
+          <select id="model-select" style="
+            flex: 1; background: var(--bg-primary); border: 1px solid var(--border-primary);
+            border-radius: 6px; padding: 6px 10px; color: var(--text-primary);
+            font-family: var(--font-mono); font-size: 11px; outline: none; cursor: pointer;
+          ">
+            ${MODELS.map(m => `
+              <option value="${m.id}"${m.id === DEFAULT_MODEL_ID ? ' selected' : ''}>
+                ${m.badge ? m.badge + ' ' : ''}${m.label} · ${m.size}
+              </option>`).join('')}
+          </select>
+        </div>
+        <div class="model-status__row" style="margin-top: 4px;">
           <button class="model-status__btn model-status__btn--primary" id="model-quickload-btn"
             style="width: 100%; padding: 8px 14px; font-size: 13px;">
-            ⚡ Load Local AI Model
+            ⬇ Download Gemma 4 E2B (2 GB)
           </button>
-        </div>
-        <div class="model-status__row" style="justify-content: center;">
-          <span class="model-status__label" style="font-size: 10px; color: var(--text-muted);">
-            local-model.task — served from /models/
-          </span>
         </div>
         <div class="model-status__progress hidden" id="model-progress">
           <div class="model-status__progress-bar" id="model-progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="model-status__row hidden" id="model-progress-text" style="justify-content: center;">
+          <span style="font-size: 10px; color: var(--text-muted);" id="model-progress-label"></span>
         </div>
         <details style="margin-top: 4px;">
           <summary style="font-size: 11px; color: var(--text-muted); cursor: pointer;">
@@ -114,13 +157,46 @@ export class ChatPanel {
   }
 
   _bindEvents() {
-    // Quick-load bundled model
+    // Model selector + download
     const quickloadBtn = this.container.querySelector('#model-quickload-btn');
+    const modelSelect = this.container.querySelector('#model-select');
+
+    const updateBtnLabel = () => {
+      const model = MODELS.find(m => m.id === modelSelect.value) || MODELS.find(m => m.id === DEFAULT_MODEL_ID);
+      quickloadBtn.textContent = `⬇ Download ${model.label} (${model.size})`;
+    };
+    updateBtnLabel();
+
+    modelSelect.addEventListener('change', updateBtnLabel);
+
     quickloadBtn.addEventListener('click', async () => {
+      const model = MODELS.find(m => m.id === modelSelect.value) || MODELS.find(m => m.id === DEFAULT_MODEL_ID);
+      const progressBar = this.container.querySelector('#model-progress-bar');
+      const progressDiv = this.container.querySelector('#model-progress');
+      const progressText = this.container.querySelector('#model-progress-text');
+      const progressLabel = this.container.querySelector('#model-progress-label');
+
+      progressDiv.classList.remove('hidden');
+      progressText.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressLabel.textContent = 'Starting download…';
+
       try {
-        await aiEngine.loadModel('/models/gemma-4-E2B-it-web.task');
+        await aiEngine.downloadAndLoad(model.url, (received, total) => {
+          if (total > 0) {
+            const pct = Math.round((received / total) * 100);
+            progressBar.style.width = `${pct}%`;
+            progressLabel.textContent = `${(received / 1048576).toFixed(0)} MB / ${(total / 1048576).toFixed(0)} MB (${pct}%)`;
+          } else {
+            progressLabel.textContent = `${(received / 1048576).toFixed(0)} MB downloaded`;
+          }
+        });
+        progressDiv.classList.add('hidden');
+        progressText.classList.add('hidden');
       } catch (err) {
-        this._addMessage('ai', `❌ Failed to load local model: ${err.message}`);
+        progressDiv.classList.add('hidden');
+        progressText.classList.add('hidden');
+        this._addMessage('ai', `❌ Download failed: ${err.message}`);
       }
     });
 
