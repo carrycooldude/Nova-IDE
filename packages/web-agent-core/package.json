@@ -1,5 +1,5 @@
 {
-  "name": "nova-web-agent-core",
+  "name": "@carrycooldude/nova-web-agent-core",
   "version": "1.0.0",
   "description": "A purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct Agent Framework.",
   "main": "src/index.js",
@@ -21,6 +21,9 @@
     "browser",
     "local-first"
   ],
-  "author": "Nova IDE Team",
-  "license": "MIT"
+  "author": "carrycooldude",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
 }
