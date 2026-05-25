@@ -8,7 +8,7 @@ By leveraging the raw power of the **Snapdragon X Elite** and its high-performan
 
 ## 🚀 The Vision: AI at the Edge
 
-Most AI-integrated IDEs rely on heavy cloud APIs. This introduces latency, subscription costs, and—most importantly—privacy concerns. **Nova IDE** flips the script. It uses **MediaPipe GenAI** and **WebGPU** to run Large Language Models (LLMs) locally.
+Most AI-integrated IDEs rely on heavy cloud APIs. This introduces latency, subscription costs, and—most importantly—privacy concerns. **Nova IDE** flips the script. It uses **LiteRT LM** and **WebGPU** to run Large Language Models (LLMs) locally.
 
 When you run Nova IDE on a machine powered by the **Snapdragon X Elite**, you're not just running a web app; you're utilizing one of the most efficient NPU/GPU architectures ever designed for portable computing.
 
@@ -29,7 +29,7 @@ graph TD
     end
 
     subgraph AI_Runtime ["AI Execution Layer"]
-        MP["MediaPipe GenAI (WASM)"]
+        MP["LiteRT LM (WASM)"]
         WG["WebGPU API"]
     end
 
@@ -47,8 +47,8 @@ graph TD
     MP -->|Streaming Tokens| UI
 ```
 
-### 1. The Inference Engine (MediaPipe + WebGPU)
-At the heart of Nova IDE is the MediaPipe GenAI runtime. Unlike traditional JavaScript which runs on the CPU, Nova IDE uses **WebGPU** to talk directly to the **Qualcomm Adreno GPU**. 
+### 1. The Inference Engine (LiteRT LM + WebGPU)
+At the heart of Nova IDE is the LiteRT LM runtime. Unlike traditional JavaScript which runs on the CPU, Nova IDE uses **WebGPU** to talk directly to the **Qualcomm Adreno GPU**. 
 - **WebGPU** allows for massively parallel tensor operations required by transformers.
 - On the Snapdragon X Elite, the Adreno GPU provides the floating-point performance needed to generate tokens at lightning speed, rivaling cloud-based solutions.
 
@@ -74,9 +74,9 @@ The Snapdragon X Elite is a breakthrough for web-based AI. While Intel and AMD h
 
 When you click **"⚡ Load Local AI Model"** in Nova IDE, the following sequence occurs:
 
-1. **WASM Initialization**: The IDE loads the MediaPipe GenAI WebAssembly runtime.
+1. **WASM Initialization**: The IDE loads the LiteRT LM WebAssembly runtime.
 2. **GPU Adapter Request**: The browser requests a WebGPU adapter. On an X Elite machine, this identifies the **Qualcomm Adreno GPU**.
-3. **Model Loading**: The model (in `.task` format) is fetched into a `SharedArrayBuffer`.
+3. **Model Loading**: The model (in `.litertlm` format) is fetched into a `SharedArrayBuffer`.
 4. **GPU Compilation**: The model's computation graph is compiled into GPU-specific kernels.
 5. **Streaming Inference**: When you type a prompt, the tokens are generated on the Adreno GPU and streamed back to the UI in real-time.
 

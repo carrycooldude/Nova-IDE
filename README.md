@@ -1,6 +1,6 @@
 # ⚡ Nova IDE
 
-Nova IDE is a lightweight, browser-based coding environment designed for the future of **on-device AI**. It leverages WebGPU and MediaPipe to run high-performance Large Language Models (LLMs) entirely within your browser—no cloud, no APIs, and total privacy.
+Nova IDE is a lightweight, browser-based coding environment designed for the future of **on-device AI**. It leverages WebGPU and LiteRT LM to run high-performance Large Language Models (LLMs) entirely within your browser—no cloud, no APIs, and total privacy.
 
 ![Nova IDE Screenshot](src/assets/hero.png)
 
@@ -60,7 +60,7 @@ Nova IDE is a lightweight, browser-based coding environment designed for the fut
 
 - **Core**: JavaScript (ESM), HTML5, CSS3
 - **Editor**: [CodeMirror 6](https://codemirror.net/)
-- **AI Engine**: [MediaPipe GenAI](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference)
+- **AI Engine**: [LiteRT LM](https://ai.google.dev/edge/litert-lm/js)
 - **Bundler**: [Vite](https://vitejs.dev/)
 - **Storage**: IndexedDB (Virtual File System)
 

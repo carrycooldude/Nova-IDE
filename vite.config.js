@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // Allow serving the large .task model file from public/
+  // Allow serving large LiteRT LM model files from public/.
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -12,9 +12,9 @@ export default defineConfig({
       timeout: 60000,
     },
   },
-  // Exclude model files from being processed by Vite's pipeline
-  assetsInclude: ['**/*.task'],
+  // Exclude model files from being processed by Vite's pipeline.
+  assetsInclude: ['**/*.litertlm'],
   optimizeDeps: {
-    exclude: ['@mediapipe/tasks-genai'],
+    exclude: ['@litert-lm/core'],
   },
 });
