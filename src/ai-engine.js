@@ -14,6 +14,15 @@ const MODEL_STATUS = {
 
 const SYSTEM_PROMPT = 'You are an expert coding assistant inside an IDE. Provide concise, correct code and explanations. Use markdown code blocks for code snippets.';
 const MIN_MODEL_BYTES = 1024 * 1024;
+const MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
+const LITERT_LM_CONFIG = {
+  maxTokens: 8192,
+  samplerParams: {
+    k: 40,
+    temperature: 0.7,
+    seed: 42,
+  },
+};
 
 class AIEngine {
   constructor() {
@@ -96,10 +105,13 @@ class AIEngine {
 
     await writable.close();
     const file = await fileHandle.getFile();
-    if (file.size < MIN_MODEL_BYTES || (total > 0 && file.size !== total)) {
+    const contentEncoding = (response.headers.get('content-encoding') || 'identity').toLowerCase();
+    const canValidateLength = total > 0 && (contentEncoding === 'identity' || contentEncoding === '');
+
+    if (file.size < MIN_MODEL_BYTES || (canValidateLength && file.size !== total)) {
       await this.deleteFromCache(filename);
       throw new Error(
-        total > 0
+        canValidateLength
           ? `Downloaded model is incomplete (${file.size} of ${total} bytes). Please retry.`
           : 'Downloaded model is incomplete. Please retry.'
       );
@@ -158,12 +170,8 @@ class AIEngine {
 
     return this.engine.createConversation({
       sessionConfig: {
-        samplerParams: {
-          k: 40,
-          temperature: 0.7,
-          seed: 42,
-        },
-        maxOutputTokens: 8192,
+        samplerParams: LITERT_LM_CONFIG.samplerParams,
+        maxOutputTokens: LITERT_LM_CONFIG.maxTokens,
       },
       preface: {
         messages: [
@@ -198,7 +206,7 @@ class AIEngine {
       this.engine = await Engine.create({
         model,
         mainExecutorSettings: {
-          maxNumTokens: 8192,
+          maxNumTokens: LITERT_LM_CONFIG.maxTokens,
         },
       });
 
@@ -349,7 +357,7 @@ class AIEngine {
         return;
       }
 
-      if (total > 1024 * 1024 * 1024) {
+      if (total > MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES) {
         throw new Error('This model is too large for memory-only loading. Enable "Save to local disk (OPFS)" and try again.');
       }
 
@@ -360,6 +368,12 @@ class AIEngine {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
+        if (received + value.length > MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES) {
+          await reader.cancel();
+          throw new Error('This model is too large for memory-only loading. Enable "Save to local disk (OPFS)" and try again.');
+        }
+
         chunks.push(value);
         received += value.length;
         if (onProgress) onProgress(received, total);
@@ -388,9 +402,16 @@ class AIEngine {
     }
   }
 
-  async dispose() {
+  async disposeAsync() {
     await this._deleteEngine();
     this._setStatus(MODEL_STATUS.IDLE, 'Engine disposed');
+  }
+
+  dispose() {
+    this._setStatus(MODEL_STATUS.IDLE, 'Engine disposed');
+    this._deleteEngine().catch(err => {
+      console.error('[AIEngine] Dispose error:', err);
+    });
   }
 }
 

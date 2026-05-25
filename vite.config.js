@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // Allow serving large LiteRT LM model files from public/.
+  // Allow serving large LiteRT LM model files from public/
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
