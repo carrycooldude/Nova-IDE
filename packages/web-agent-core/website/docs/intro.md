@@ -6,7 +6,7 @@ sidebar_position: 1
 
 Welcome to **Nova Web Agent Core**!
 
-This package provides a purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct (Reason+Act) Agent Framework. It is built for local-first, privacy-respecting AI applications using MediaPipe GenAI and lightweight models like Gemma.
+This package provides a purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct (Reason+Act) Agent Framework. It is built for local-first, privacy-respecting AI applications using LiteRT LM and lightweight models like Gemma.
 
 ## Why this framework?
 
@@ -80,7 +80,7 @@ Your LLM wrapper only needs one method: `generateRaw(prompt, onTokenCallback)`.
 ```javascript
 const aiEngine = {
   generateRaw: async (prompt, onToken) => {
-    // Call MediaPipe, Transformers.js, or even a cloud API here
+    // Call LiteRT LM, Transformers.js, or even a cloud API here
     // stream tokens to onToken(token)
   }
 };

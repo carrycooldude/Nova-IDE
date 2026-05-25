@@ -10,17 +10,17 @@ import { vfs } from './file-system.js';
 const MODELS = [
   {
     id: 'gemma4-e2b',
-    label: 'Gemma 4 E2B',
+    label: 'Gemma 4 E2B LiteRT LM',
     size: '2 GB',
     badge: '★ Recommended',
-    url: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task',
+    url: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm',
   },
   {
     id: 'gemma4-e4b',
-    label: 'Gemma 4 E4B',
+    label: 'Gemma 4 E4B LiteRT LM',
     size: '3 GB',
     badge: '🔥 Best',
-    url: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.task',
+    url: 'https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.litertlm',
   },
 ];
 
@@ -94,7 +94,7 @@ export class ChatPanel {
           </summary>
           <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
             <div class="model-status__row" style="gap: 8px; flex-wrap: wrap;">
-              <input type="file" id="model-file-input" accept=".task,.bin,.tflite" style="display:none">
+              <input type="file" id="model-file-input" accept=".litertlm" style="display:none">
               <button class="model-status__btn model-status__btn--primary" id="model-upload-btn"
                 style="flex: 1;">
                 📁 Upload File
@@ -102,7 +102,7 @@ export class ChatPanel {
             </div>
             <div class="model-status__row" style="gap: 6px;">
               <input type="text" id="model-url-input"
-                placeholder="https://...model.task"
+                placeholder="https://...model.litertlm"
                 style="flex:1; background: var(--bg-primary); border: 1px solid var(--border-primary); 
                        border-radius: 6px; padding: 5px 10px; color: var(--text-primary); 
                        font-family: var(--font-mono); font-size: 11px; outline: none;">
