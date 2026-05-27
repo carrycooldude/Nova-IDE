@@ -1,84 +1,87 @@
-# ⚡ Nova IDE
+# Nova IDE
 
-Nova IDE is a lightweight, browser-based coding environment designed for the future of **on-device AI**. It leverages WebGPU and MediaPipe to run high-performance Large Language Models (LLMs) entirely within your browser—no cloud, no APIs, and total privacy.
+Nova IDE is a lightweight coding environment for on-device AI. It uses WebGPU and LiteRT LM to run Gemma models locally, with a browser demo mode and an Electron desktop shell for real local workspaces.
 
 ![Nova IDE Screenshot](src/assets/hero.png)
 
-## ✨ Features
+## Features
 
-- **On-Device Inference**: Run AI models like Gemma 4 locally using your machine's GPU (via WebGPU).
-- **Total Privacy**: Your code and prompts never leave your browser.
-- **High-Performance Editor**: Built on CodeMirror 6 with support for Python, JavaScript, HTML, and CSS.
-- **Integrated Terminal**: A simulated terminal for executing commands and environment inspection.
-- **Virtual File System**: In-browser file management backed by IndexedDB.
-- **Modern UI**: A premium, VS Code-inspired dark theme with glassmorphism and smooth micro-animations.
+- **On-device inference**: Run LiteRT LM models locally through WebGPU.
+- **Privacy-first workflow**: Code and prompts stay on the local machine.
+- **CodeMirror editor**: Multi-tab editing with language-aware highlighting.
+- **Agentic coding modes**: Ask, Edit, Agent, and Architect modes for read-only help, focused edits, multi-file tasks, and planning.
+- **Safe agent changes**: Agent writes become reviewable proposals with per-file apply/discard controls and rollback checkpoints.
+- **Workspace awareness**: Local file indexing and search help the assistant retrieve relevant context before answering or proposing changes.
+- **Environment panel**: A simulated diagnostics panel for runtime, WebGPU, and model environment inspection.
+- **Browser and desktop storage**: IndexedDB demo files in browser mode, OPFS model caching, and real local workspace access in Electron.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- **Google Chrome** (Version 113 or higher recommended for WebGPU support).
-- **Node.js** (for running the development server).
+- Chrome or Electron with WebGPU support.
+- Node.js and npm.
 
-### Installation
+### Browser Development
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/carrycooldude/Nova-IDE.git
-   cd Nova-IDE
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+Open `http://localhost:5173` in your browser.
 
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+### Desktop App
 
-4. Open `http://localhost:5173` in your browser.
+Run the Electron desktop shell in development:
 
-## 🤖 Using the AI Assistant
+```bash
+npm run dev:electron
+```
 
-1. Open the **AI Panel** (shortcut: `Ctrl+Shift+A`).
-2. Click **⚡ Load Local AI Model** to initialize the model from the local assets.
-   - *Note: The model file is large (1GB+) and will be downloaded into your browser's memory and compiled for your GPU.*
-3. Once the status turns **✅ AI Ready**, start chatting!
+Build the renderer and an unpacked desktop app:
 
-## ⌨️ Keyboard Shortcuts
+```bash
+npm run build:electron
+```
+
+Create distributable desktop packages:
+
+```bash
+npm run dist
+```
+
+## Using The AI Assistant
+
+1. Open the AI panel with `Ctrl+Shift+A`.
+2. Choose a mode:
+   - **Ask**: read-only codebase questions.
+   - **Edit**: focused edits for the current selection or file.
+   - **Agent**: multi-file tasks with workspace tools and reviewable change proposals.
+   - **Architect**: planning, system design, and implementation guidance.
+3. Download or upload a `.litertlm` model. OPFS caching is recommended for large Gemma 4 LiteRT LM files.
+4. In Agent mode, inspect the activity timeline, review proposed file changes, then apply, discard, or rollback.
+
+## Keyboard Shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| --- | --- |
 | `Ctrl + B` | Toggle File Explorer |
 | `Ctrl + Shift + A` | Toggle AI Panel |
-| `Ctrl + \`` | Toggle Terminal |
+| `Ctrl + Shift + P` | Open Command Palette |
+| `Ctrl + K` | Quick AI Action |
+| `Ctrl + \`` | Toggle Environment Panel |
 | `Ctrl + S` | Save Current File |
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Core**: JavaScript (ESM), HTML5, CSS3
-- **Editor**: [CodeMirror 6](https://codemirror.net/)
-- **AI Engine**: [MediaPipe GenAI](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference)
-- **Bundler**: [Vite](https://vitejs.dev/)
-- **Storage**: IndexedDB (Virtual File System)
+- **Core**: JavaScript, HTML, CSS
+- **Desktop**: Electron
+- **Editor**: CodeMirror 6
+- **AI Engine**: LiteRT LM
+- **Bundler**: Vite
+- **Storage**: IndexedDB, OPFS, Electron filesystem IPC
 
-## 📄 License
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
-
-
-https://github.com/user-attachments/assets/989acde6-957d-4df2-8cf0-cf3365810489
-
-
-
-https://github.com/user-attachments/assets/169f3cc4-37b6-48e8-9371-f051bc7a43cd
-
-
-
----
-*Powered by On-Device AI.*
-
-

@@ -1,12 +1,8 @@
 /**
- * agent.js — Agentic coding capabilities for Nova IDE.
- * Provides: Command Palette, Inline Actions, Context Gathering, Diff Engine, Agent Mode.
+ * agent.js - Command palette, inline actions, editor context, and diff helpers.
  */
-import { aiEngine } from './ai-engine.js';
 import { vfs } from './file-system.js';
 
-// ---- Editor Context Bridge ----
-// main.js will set these so the agent can read editor state
 export const editorContext = {
   getView: () => null,
   getCurrentFile: () => null,
@@ -18,7 +14,6 @@ export const editorContext = {
   insertAt: () => {},
 };
 
-// ---- Command Palette ----
 export class CommandPalette {
   constructor() {
     this.visible = false;
@@ -29,18 +24,23 @@ export class CommandPalette {
 
   _buildCommands() {
     return [
-      { id: 'explain',    icon: '💡', label: 'Explain Selection',          category: 'AI',     action: () => this._aiAction('explain') },
-      { id: 'fix',        icon: '🔧', label: 'Fix Selected Code',          category: 'AI',     action: () => this._aiAction('fix') },
-      { id: 'refactor',   icon: '♻️', label: 'Refactor Selection',         category: 'AI',     action: () => this._aiAction('refactor') },
-      { id: 'document',   icon: '📝', label: 'Add Documentation',          category: 'AI',     action: () => this._aiAction('document') },
-      { id: 'tests',      icon: '🧪', label: 'Generate Tests',             category: 'AI',     action: () => this._aiAction('tests') },
-      { id: 'optimize',   icon: '⚡', label: 'Optimize Performance',       category: 'AI',     action: () => this._aiAction('optimize') },
-      { id: 'complete',   icon: '✦',  label: 'Complete Code at Cursor',    category: 'AI',     action: () => this._aiAction('complete') },
-      { id: 'agent',      icon: '🤖', label: 'Agent Mode: Plan & Execute', category: 'Agent',  action: () => this._agentMode() },
-      { id: 'newfile',    icon: '📄', label: 'New File',                   category: 'File',   action: () => this._newFile() },
-      { id: 'save',       icon: '💾', label: 'Save Current File',          category: 'File',   action: () => this._save() },
-      { id: 'toggleAI',   icon: '✦',  label: 'Toggle AI Panel',           category: 'View',   action: () => document.getElementById('act-ai')?.click() },
-      { id: 'toggleTerm', icon: '⌨',  label: 'Toggle Terminal',           category: 'View',   action: () => document.getElementById('act-terminal')?.click() },
+      { id: 'explain', icon: 'i', label: 'Explain Selection', category: 'AI', action: () => this._aiAction('explain') },
+      { id: 'fix', icon: '!', label: 'Fix Selected Code', category: 'AI', action: () => this._aiAction('fix') },
+      { id: 'refactor', icon: 'R', label: 'Refactor Selection', category: 'AI', action: () => this._aiAction('refactor') },
+      { id: 'document', icon: 'D', label: 'Add Documentation', category: 'AI', action: () => this._aiAction('document') },
+      { id: 'tests', icon: 'T', label: 'Generate Tests', category: 'AI', action: () => this._aiAction('tests') },
+      { id: 'optimize', icon: 'O', label: 'Optimize Performance', category: 'AI', action: () => this._aiAction('optimize') },
+      { id: 'complete', icon: '+', label: 'Complete Code at Cursor', category: 'AI', action: () => this._aiAction('complete') },
+      { id: 'modeAsk', icon: '?', label: 'AI Mode: Ask', category: 'Agent', action: () => this._setAIMode('ask') },
+      { id: 'modeEdit', icon: '*', label: 'AI Mode: Edit', category: 'Agent', action: () => this._setAIMode('edit') },
+      { id: 'agent', icon: 'A', label: 'Agent Mode: Plan & Execute', category: 'Agent', action: () => this._agentMode() },
+      { id: 'architect', icon: '#', label: 'AI Mode: Architect', category: 'Agent', action: () => this._setAIMode('architect') },
+      { id: 'newfile', icon: 'N', label: 'New File', category: 'File', action: () => this._newFile() },
+      { id: 'save', icon: 'S', label: 'Save Current File', category: 'File', action: () => this._save() },
+      { id: 'openWorkspace', icon: '[]', label: 'Open Workspace', category: 'File', action: () => dispatchAppCommand('open-workspace') },
+      { id: 'saveAs', icon: '>>', label: 'Save As', category: 'File', action: () => dispatchAppCommand('save-as') },
+      { id: 'toggleAI', icon: 'AI', label: 'Toggle AI Panel', category: 'View', action: () => document.getElementById('act-ai')?.click() },
+      { id: 'toggleTerm', icon: '>', label: 'Toggle Environment Panel', category: 'View', action: () => document.getElementById('act-terminal')?.click() },
     ];
   }
 
@@ -51,13 +51,13 @@ export class CommandPalette {
     overlay.innerHTML = `
       <div class="cmd-palette">
         <div class="cmd-palette__input-row">
-          <span class="cmd-palette__icon">⚡</span>
+          <span class="cmd-palette__icon">></span>
           <input type="text" class="cmd-palette__input" id="cmd-input"
-            placeholder="Type a command or AI action…" autocomplete="off" spellcheck="false">
+            placeholder="Type a command or AI action..." autocomplete="off" spellcheck="false">
         </div>
         <div class="cmd-palette__list" id="cmd-list"></div>
         <div class="cmd-palette__footer">
-          <span><kbd>↑↓</kbd> Navigate</span>
+          <span><kbd>Up/Down</kbd> Navigate</span>
           <span><kbd>Enter</kbd> Run</span>
           <span><kbd>Esc</kbd> Close</span>
         </div>
@@ -70,15 +70,11 @@ export class CommandPalette {
     const overlay = document.getElementById('command-palette-overlay');
     const input = document.getElementById('cmd-input');
 
-    // Close on overlay click
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) this.hide();
     });
 
-    // Filter commands
     input.addEventListener('input', () => this._renderList(input.value));
-
-    // Keyboard nav
     input.addEventListener('keydown', (e) => {
       const items = document.querySelectorAll('.cmd-palette__item');
       const active = document.querySelector('.cmd-palette__item.active');
@@ -86,30 +82,26 @@ export class CommandPalette {
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (active) active.classList.remove('active');
-        const next = items[Math.min(idx + 1, items.length - 1)];
-        if (next) next.classList.add('active');
+        active?.classList.remove('active');
+        items[Math.min(idx + 1, items.length - 1)]?.classList.add('active');
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (active) active.classList.remove('active');
-        const prev = items[Math.max(idx - 1, 0)];
-        if (prev) prev.classList.add('active');
+        active?.classList.remove('active');
+        items[Math.max(idx - 1, 0)]?.classList.add('active');
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (active) active.click();
+        active?.click();
       } else if (e.key === 'Escape') {
         this.hide();
       }
     });
 
-    // Global shortcut
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'P') {
         e.preventDefault();
         this.toggle();
       }
-      // Ctrl+K for quick inline action
-      if (e.ctrlKey && e.key === 'k') {
+      if (e.ctrlKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         this.show();
       }
@@ -173,20 +165,19 @@ export class CommandPalette {
     this.visible ? this.hide() : this.show();
   }
 
-  // ---- AI Actions ----
   async _aiAction(type) {
     const ctx = gatherContext();
     if (!ctx.selection && ['explain', 'fix', 'refactor', 'document', 'tests', 'optimize'].includes(type)) {
-      dispatchToChat('⚠️ Select some code first, then use this action.');
+      dispatchToChat('Select code first, then use this action.');
       return;
     }
 
     const prompts = {
-      explain:  `Explain this code concisely:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
-      fix:      `Fix any bugs in this code. Return the corrected code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+      explain: `Explain this code concisely:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+      fix: `Fix any bugs in this code. Return the corrected code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
       refactor: `Refactor this code for clarity and best practices. Return the improved code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
-      document: `Add comprehensive documentation/comments to this code. Return the documented code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
-      tests:    `Generate unit tests for this code. Return the tests in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+      document: `Add useful documentation/comments to this code. Return the documented code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+      tests: `Generate unit tests for this code. Return the tests in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
       optimize: `Optimize this code for performance. Return the optimized code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
       complete: `Complete the code at the cursor position. Context:\n\nFile: ${ctx.fileName}\nLanguage: ${ctx.language}\nCurrent cursor line: ${ctx.cursorLine}\n\n\`\`\`${ctx.language}\n${ctx.fileContent}\n\`\`\`\n\nProvide the completion in a code block.`,
     };
@@ -198,23 +189,25 @@ export class CommandPalette {
     dispatchToChat(null, null, 'agent');
   }
 
-  _newFile() {
-    const name = prompt('Enter file name (e.g. utils.js):');
-    if (!name) return;
-    const path = `/src/${name}`;
-    vfs.writeFile(path, `// ${name}\n`);
+  async _setAIMode(mode) {
+    dispatchToChat(null, null, `mode:${mode}`);
   }
 
-  _save() {
+  async _newFile() {
+    const name = prompt('Enter file name (e.g. utils.js):');
+    if (!name) return;
+    await vfs.createFile(`/src/${name}`, `// ${name}\n`);
+  }
+
+  async _save() {
     const view = editorContext.getView();
     const file = editorContext.getCurrentFile();
     if (view && file) {
-      vfs.writeFile(file, view.state.doc.toString());
+      await vfs.writeFile(file, view.state.doc.toString());
     }
   }
 }
 
-// ---- Context Gathering ----
 export function gatherContext() {
   const view = editorContext.getView();
   const filePath = editorContext.getCurrentFile();
@@ -243,7 +236,6 @@ export function gatherContext() {
   };
 }
 
-// ---- Inline Code Actions (Context Menu) ----
 export class InlineActions {
   constructor() {
     this._injectDOM();
@@ -255,11 +247,11 @@ export class InlineActions {
     menu.id = 'inline-actions-menu';
     menu.className = 'inline-actions hidden';
     menu.innerHTML = `
-      <button class="inline-actions__btn" data-action="explain">💡 Explain</button>
-      <button class="inline-actions__btn" data-action="fix">🔧 Fix</button>
-      <button class="inline-actions__btn" data-action="refactor">♻️ Refactor</button>
-      <button class="inline-actions__btn" data-action="document">📝 Document</button>
-      <button class="inline-actions__btn" data-action="tests">🧪 Tests</button>
+      <button class="inline-actions__btn" data-action="explain">Explain</button>
+      <button class="inline-actions__btn" data-action="fix">Fix</button>
+      <button class="inline-actions__btn" data-action="refactor">Refactor</button>
+      <button class="inline-actions__btn" data-action="document">Document</button>
+      <button class="inline-actions__btn" data-action="tests">Tests</button>
     `;
     document.body.appendChild(menu);
   }
@@ -267,9 +259,7 @@ export class InlineActions {
   _bind() {
     const menu = document.getElementById('inline-actions-menu');
 
-    // Show on text selection in editor (via mouseup)
     document.addEventListener('mouseup', (e) => {
-      // Small delay to let selection finalize
       setTimeout(() => {
         const view = editorContext.getView();
         if (!view) return;
@@ -290,14 +280,10 @@ export class InlineActions {
       }, 150);
     });
 
-    // Hide on click outside
     document.addEventListener('mousedown', (e) => {
-      if (!menu.contains(e.target)) {
-        menu.classList.add('hidden');
-      }
+      if (!menu.contains(e.target)) menu.classList.add('hidden');
     });
 
-    // Handle action clicks
     menu.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
@@ -305,33 +291,29 @@ export class InlineActions {
       const action = btn.dataset.action;
       const ctx = gatherContext();
       const prompts = {
-        explain:  `Explain this code:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
-        fix:      `Fix bugs in this code. Return corrected code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+        explain: `Explain this code:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+        fix: `Fix bugs in this code. Return corrected code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
         refactor: `Refactor this code. Return improved code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
         document: `Add documentation to this code. Return documented code in a code block:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
-        tests:    `Generate tests for this code:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
+        tests: `Generate tests for this code:\n\n\`\`\`${ctx.language}\n${ctx.selection}\n\`\`\``,
       };
       dispatchToChat(null, prompts[action], action);
     });
   }
 }
 
-// ---- Diff Engine ----
 export function computeDiff(original, modified) {
-  const origLines = original.split('\n');
-  const modLines = modified.split('\n');
+  const origLines = String(original || '').split('\n');
+  const modLines = String(modified || '').split('\n');
   const diff = [];
   const maxLen = Math.max(origLines.length, modLines.length);
 
   for (let i = 0; i < maxLen; i++) {
     const o = origLines[i];
     const m = modLines[i];
-
-    if (o === undefined) {
-      diff.push({ type: 'added', line: i + 1, content: m });
-    } else if (m === undefined) {
-      diff.push({ type: 'removed', line: i + 1, content: o });
-    } else if (o !== m) {
+    if (o === undefined) diff.push({ type: 'added', line: i + 1, content: m });
+    else if (m === undefined) diff.push({ type: 'removed', line: i + 1, content: o });
+    else if (o !== m) {
       diff.push({ type: 'removed', line: i + 1, content: o });
       diff.push({ type: 'added', line: i + 1, content: m });
     } else {
@@ -350,11 +332,9 @@ export function renderDiffHTML(diff) {
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ---- Chat Dispatch ----
-// This will be set by chat.js to receive agentic commands
 let _chatDispatcher = null;
 
 export function setChatDispatcher(fn) {
@@ -365,4 +345,8 @@ function dispatchToChat(systemMessage, prompt, actionType) {
   if (_chatDispatcher) {
     _chatDispatcher({ systemMessage, prompt, actionType });
   }
+}
+
+function dispatchAppCommand(command) {
+  window.dispatchEvent(new CustomEvent('nova-command-palette', { detail: command }));
 }

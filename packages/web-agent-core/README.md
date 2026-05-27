@@ -2,7 +2,7 @@
 
 A purely in-browser, WebGPU-accelerated, zero-dependency autonomous ReAct (Reason+Act) Agent Framework.
 
-Built for local-first, privacy-respecting AI applications using MediaPipe GenAI and lightweight models like Gemma.
+Built for local-first, privacy-respecting AI applications using LiteRT LM and lightweight models like Gemma.
 
 ## Features
 - **Zero Backend**: Runs entirely in the browser using WebGPU.
@@ -41,7 +41,7 @@ const myTools = [
 // Your LLM object just needs a \`generateRaw(history, onToken)\` method
 const aiEngine = {
   generateRaw: async (prompt, onToken) => {
-    // Call MediaPipe or Transformers.js here
+    // Call LiteRT LM, Transformers.js, or another local model runtime here
     // stream tokens to onToken(token)
   }
 };
