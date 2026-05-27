@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: './',
   // Allow serving large LiteRT LM model files from public/
   server: {
     headers: {

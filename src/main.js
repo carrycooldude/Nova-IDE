@@ -8,6 +8,9 @@ import { createEditor, destroyEditor } from './editor.js';
 import { ChatPanel } from './chat.js';
 import { Terminal } from './terminal.js';
 import { CommandPalette, InlineActions, editorContext } from './agent.js';
+import { aiEngine } from './ai-engine.js';
+import { buildWorkspaceIndex } from './workspace-index.js';
+import { proposalManager } from './change-manager.js';
 
 // ---- State ----
 let currentFile = null;
@@ -97,7 +100,7 @@ function buildShell() {
         <!-- Bottom Panel (Terminal) -->
         <div class="bottom-panel" id="bottom-panel">
           <div class="bottom-panel__header">
-            <span class="bottom-panel__tab active">Terminal</span>
+            <span class="bottom-panel__tab active">Environment</span>
             <span class="bottom-panel__tab">Output</span>
             <div class="bottom-panel__spacer"></div>
             <button class="bottom-panel__toggle" id="toggle-terminal" title="Toggle terminal">✕</button>
@@ -132,6 +135,7 @@ function renderFileTree() {
   const tree = vfs.getTree();
   container.innerHTML = '';
   renderNode(tree, container, 0);
+  updateWorkspaceTitle();
 }
 
 function renderNode(node, parent, depth) {
@@ -208,14 +212,14 @@ function renderTabs() {
   });
 }
 
-function closeTab(path) {
+async function closeTab(path) {
   const idx = openTabs.indexOf(path);
   if (idx === -1) return;
   openTabs.splice(idx, 1);
 
   if (currentFile === path) {
     if (openTabs.length > 0) {
-      openFile(openTabs[Math.min(idx, openTabs.length - 1)]);
+      await openFile(openTabs[Math.min(idx, openTabs.length - 1)]);
     } else {
       currentFile = null;
       destroyEditor(editorView);
@@ -227,14 +231,14 @@ function closeTab(path) {
 }
 
 // ---- Editor ----
-function openFile(path) {
+async function openFile(path) {
   const file = vfs.readFile(path);
   if (!file) return;
 
   // Save current file content
   if (editorView && currentFile) {
     const content = editorView.state.doc.toString();
-    vfs.writeFile(currentFile, content);
+    await vfs.writeFile(currentFile, content);
   }
 
   currentFile = path;
@@ -257,7 +261,7 @@ function openFile(path) {
   container.querySelectorAll('.cm-editor').forEach(el => el.remove());
 
   editorView = createEditor(container, file.content, file.language, (newContent) => {
-    vfs.writeFile(path, newContent, file.language);
+    vfs.writeFile(path, newContent, file.language).catch(console.error);
     // Update cursor position in status bar
     if (editorView) {
       const pos = editorView.state.selection.main.head;
@@ -293,6 +297,79 @@ function showWelcome() {
   if (welcome) welcome.style.display = '';
   document.getElementById('sb-lang').textContent = '—';
   document.getElementById('sb-cursor').textContent = 'Ln 1, Col 1';
+}
+
+function updateWorkspaceTitle() {
+  const header = document.querySelector('.sidebar__header');
+  if (header) header.textContent = vfs.workspaceName || 'Explorer';
+
+  const branch = document.getElementById('sb-branch');
+  if (branch) branch.textContent = vfs.isDesktop && vfs.workspaceRoot ? `Workspace: ${vfs.workspaceName}` : '⑂ main';
+}
+
+async function saveCurrentFile() {
+  if (!editorView || !currentFile) return;
+  await vfs.writeFile(currentFile, editorView.state.doc.toString());
+}
+
+async function saveCurrentFileAs() {
+  if (!editorView) return;
+  const suggestedName = currentFile ? currentFile.split('/').pop() : 'untitled.txt';
+  const selectedPath = await vfs.saveFileAs(editorView.state.doc.toString(), suggestedName);
+  if (selectedPath) {
+    await openFile(selectedPath);
+  }
+}
+
+async function openWorkspaceFromDialog() {
+  const selectedPath = await vfs.openWorkspace();
+  openTabs.splice(0, openTabs.length);
+  currentFile = null;
+  if (editorView) {
+    destroyEditor(editorView);
+    editorView = null;
+  }
+  renderFileTree();
+  renderTabs();
+  const firstFile = selectedPath || findFirstFile(vfs.getTree());
+  if (firstFile) await openFile(firstFile);
+  else showWelcome();
+}
+
+async function openFileFromDialog() {
+  const selectedPath = await vfs.openFileFromDialog();
+  if (selectedPath) {
+    openTabs.splice(0, openTabs.length);
+    renderFileTree();
+    await openFile(selectedPath);
+  }
+}
+
+async function closeWorkspace() {
+  await saveCurrentFile();
+  await vfs.closeWorkspace();
+  openTabs.splice(0, openTabs.length);
+  currentFile = null;
+  if (editorView) {
+    destroyEditor(editorView);
+    editorView = null;
+  }
+  renderFileTree();
+  renderTabs();
+  showWelcome();
+}
+
+function showGpuDiagnostics() {
+  const status = navigator.gpu ? 'WebGPU is available in this renderer.' : 'WebGPU is not available in this renderer.';
+  const index = buildWorkspaceIndex();
+  const checkpoint = proposalManager.getLatestCheckpoint();
+  alert(`${status}
+
+LiteRT LM status: ${aiEngine.statusMessage}
+Workspace: ${vfs.workspaceName || 'None'} (${index.fileCount} indexed files)
+Latest checkpoint: ${checkpoint ? `${checkpoint.files.length} file(s), ${new Date(checkpoint.createdAt).toLocaleString()}` : 'None'}
+
+LiteRT LM runs in the renderer and depends on Chromium WebGPU support.`);
 }
 
 // ---- Panel Toggles ----
@@ -333,10 +410,33 @@ function bindKeyboard() {
     // Ctrl+S: save current file
     if (e.ctrlKey && e.key === 's') {
       e.preventDefault();
-      if (editorView && currentFile) {
-        vfs.writeFile(currentFile, editorView.state.doc.toString());
-      }
+      saveCurrentFile();
     }
+  });
+}
+
+function bindDesktopMenuCommands() {
+  const handlers = {
+    'open-workspace': openWorkspaceFromDialog,
+    'open-folder': openWorkspaceFromDialog,
+    'open-file': openFileFromDialog,
+    'save': saveCurrentFile,
+    'save-as': saveCurrentFileAs,
+    'close-workspace': closeWorkspace,
+    'toggle-explorer': toggleSidebar,
+    'toggle-ai': toggleAIPanel,
+    'toggle-terminal': toggleTerminal,
+    'gpu-diagnostics': showGpuDiagnostics,
+  };
+
+  window.addEventListener('nova-command-palette', (event) => {
+    handlers[event.detail]?.();
+  });
+
+  if (!window.novaDesktop?.onMenuCommand) return;
+
+  window.novaDesktop.onMenuCommand((command) => {
+    handlers[command]?.();
   });
 }
 
@@ -366,12 +466,17 @@ async function init() {
   document.getElementById('act-ai').addEventListener('click', toggleAIPanel);
   document.getElementById('act-terminal').addEventListener('click', toggleTerminal);
   document.getElementById('toggle-terminal').addEventListener('click', toggleTerminal);
+  document.getElementById('menu-file').addEventListener('click', () => {
+    if (vfs.isDesktop) openWorkspaceFromDialog();
+  });
+  document.getElementById('menu-view').addEventListener('click', toggleSidebar);
+  document.getElementById('menu-help').addEventListener('click', showGpuDiagnostics);
 
   // Bind keyboard shortcuts
   bindKeyboard();
+  bindDesktopMenuCommands();
 
   // Update model status in titlebar
-  const { aiEngine } = await import('./ai-engine.js');
   aiEngine.onStatusChange((info) => {
     const el = document.getElementById('titlebar-model-status');
     if (el) el.textContent = info.status === 'ready' ? '✅ AI Ready' : info.message;
@@ -380,7 +485,7 @@ async function init() {
   // Open first file automatically
   const tree = vfs.getTree();
   const firstFile = findFirstFile(tree);
-  if (firstFile) openFile(firstFile);
+  if (firstFile) await openFile(firstFile);
 }
 
 function findFirstFile(node) {
