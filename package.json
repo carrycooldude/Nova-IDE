@@ -20,7 +20,7 @@
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lint": "^6.9.6",
     "@codemirror/theme-one-dark": "^6.1.3",
-    "@mediapipe/tasks-genai": "^0.10.27",
+    "@litert-lm/core": "^0.12.1",
     "codemirror": "^6.0.2"
   }
 }

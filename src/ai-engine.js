@@ -1,6 +1,6 @@
 /**
- * ai-engine.js — Local AI Inference wrapper
- * Uses @mediapipe/tasks-genai for on-device WebGPU inference.
+ * ai-engine.js - Local AI inference wrapper.
+ * Uses LiteRT LM for on-device WebGPU inference.
  */
 
 const MODEL_STATUS = {
@@ -12,13 +12,26 @@ const MODEL_STATUS = {
   GENERATING: 'generating',
 };
 
+const SYSTEM_PROMPT = 'You are an expert coding assistant inside an IDE. Provide concise, correct code and explanations. Use markdown code blocks for code snippets.';
+const MIN_MODEL_BYTES = 1024 * 1024;
+const MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
+const LITERT_LM_CONFIG = {
+  maxTokens: 8192,
+  samplerParams: {
+    k: 40,
+    temperature: 0.7,
+    seed: 42,
+  },
+};
+
 class AIEngine {
   constructor() {
-    this.llmInference = null;
+    this.engine = null;
+    this.conversation = null;
     this.status = MODEL_STATUS.IDLE;
     this.statusMessage = 'No model loaded';
     this.listeners = new Set();
-    this.modelName = 'Local AI Engine';
+    this.modelName = 'LiteRT LM';
     this._opfsRoot = null;
   }
 
@@ -29,19 +42,23 @@ class AIEngine {
     return this._opfsRoot;
   }
 
-  /** Check if a model exists in OPFS cache */
+  /** Check if a model exists in OPFS cache. */
   async getCachedModel(filename) {
     try {
       const root = await this._getOpfs();
       const fileHandle = await root.getFileHandle(filename);
       const file = await fileHandle.getFile();
+      if (file.size < MIN_MODEL_BYTES) {
+        await root.removeEntry(filename);
+        return null;
+      }
       return file;
     } catch (e) {
       return null;
     }
   }
 
-  /** Save a buffer to OPFS cache */
+  /** Save a buffer to OPFS cache. */
   async saveToCache(filename, buffer) {
     try {
       const root = await this._getOpfs();
@@ -55,7 +72,54 @@ class AIEngine {
     }
   }
 
-  /** Delete a model from OPFS cache */
+  /** Stream a response body directly into OPFS without buffering the model in RAM. */
+  async saveResponseToCache(filename, response, onProgress) {
+    const root = await this._getOpfs();
+    const fileHandle = await root.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    const reader = response.body.getReader();
+    const total = parseInt(response.headers.get('content-length') || '0');
+    let received = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        await writable.write(value);
+        received += value.length;
+
+        if (onProgress) onProgress(received, total);
+        this._setStatus(
+          MODEL_STATUS.DOWNLOADING,
+          total
+            ? `Downloading... ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`
+            : `Downloading... ${(received / 1048576).toFixed(0)} MB`
+        );
+      }
+    } catch (err) {
+      await writable.abort();
+      await this.deleteFromCache(filename);
+      throw err;
+    }
+
+    await writable.close();
+    const file = await fileHandle.getFile();
+    const contentEncoding = (response.headers.get('content-encoding') || 'identity').toLowerCase();
+    const canValidateLength = total > 0 && (contentEncoding === 'identity' || contentEncoding === '');
+
+    if (file.size < MIN_MODEL_BYTES || (canValidateLength && file.size !== total)) {
+      await this.deleteFromCache(filename);
+      throw new Error(
+        canValidateLength
+          ? `Downloaded model is incomplete (${file.size} of ${total} bytes). Please retry.`
+          : 'Downloaded model is incomplete. Please retry.'
+      );
+    }
+    return file;
+  }
+
+  /** Delete a model from OPFS cache. */
   async deleteFromCache(filename) {
     try {
       const root = await this._getOpfs();
@@ -63,7 +127,7 @@ class AIEngine {
     } catch (e) {}
   }
 
-  /** Subscribe to status changes */
+  /** Subscribe to status changes. */
   onStatusChange(fn) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -84,59 +148,70 @@ class AIEngine {
     this._emit();
   }
 
+  async _deleteConversation() {
+    if (this.conversation) {
+      await this.conversation.delete();
+      this.conversation = null;
+    }
+  }
+
+  async _deleteEngine() {
+    await this._deleteConversation();
+    if (this.engine) {
+      await this.engine.delete();
+      this.engine = null;
+    }
+  }
+
+  async _createConversation() {
+    if (!this.engine) {
+      throw new Error('Model not loaded');
+    }
+
+    return this.engine.createConversation({
+      sessionConfig: {
+        samplerParams: LITERT_LM_CONFIG.samplerParams,
+        maxOutputTokens: LITERT_LM_CONFIG.maxTokens,
+      },
+      preface: {
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+        ],
+      },
+    });
+  }
+
   /**
-   * Load model from a URL or user-uploaded file.
+   * Load model from a URL, OPFS File, or user-uploaded file.
    * @param {string|File} modelSource - URL string or File object
    */
   async loadModel(modelSource) {
     try {
-      this._setStatus(MODEL_STATUS.LOADING, 'Importing AI Engine…');
+      this._setStatus(MODEL_STATUS.LOADING, 'Importing LiteRT LM...');
 
-      // Dynamic import so initial page load is fast
-      const genai = await import('@mediapipe/tasks-genai');
-      const { FilesetResolver, LlmInference } = genai;
+      const { Engine } = await import('@litert-lm/core');
 
-      this._setStatus(MODEL_STATUS.LOADING, 'Loading AI runtime…');
+      await this._deleteEngine();
 
-      // Initialize the WASM fileset resolver (required by MediaPipe)
-      const genaiFileset = await FilesetResolver.forGenAiTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@latest/wasm'
-      );
-
-      this._setStatus(MODEL_STATUS.LOADING, 'Initializing LLM engine…');
-
-      let modelAssetPath = null;
-      let modelAssetBuffer = null;
-
-      if (typeof modelSource === 'string') {
-        modelAssetPath = modelSource;
-        this._setStatus(MODEL_STATUS.DOWNLOADING, 'Downloading model…');
-      } else if (modelSource instanceof File) {
-        this._setStatus(MODEL_STATUS.LOADING, 'Reading model file…');
-        const buf = await modelSource.arrayBuffer();
-        modelAssetBuffer = new Uint8Array(buf);
+      let model = modelSource;
+      if (modelSource instanceof File) {
+        this._setStatus(MODEL_STATUS.LOADING, 'Reading LiteRT LM model file...');
+        model = modelSource.stream();
+      } else if (typeof modelSource === 'string') {
+        this._setStatus(MODEL_STATUS.DOWNLOADING, 'Preparing model download...');
       }
 
-      this._setStatus(MODEL_STATUS.LOADING, 'Compiling model for WebGPU…');
+      this._setStatus(MODEL_STATUS.LOADING, 'Initializing LiteRT LM engine...');
 
-      const options = {
-        baseOptions: {},
-        maxTokens: 8192,
-        topK: 40,
-        temperature: 0.7,
-        randomSeed: 42,
-      };
+      this.engine = await Engine.create({
+        model,
+        mainExecutorSettings: {
+          maxNumTokens: LITERT_LM_CONFIG.maxTokens,
+        },
+      });
 
-      if (modelAssetPath) {
-        options.baseOptions.modelAssetPath = modelAssetPath;
-      }
-      if (modelAssetBuffer) {
-        options.baseOptions.modelAssetBuffer = modelAssetBuffer;
-      }
-
-      // FilesetResolver must be passed as the first argument
-      this.llmInference = await LlmInference.createFromOptions(genaiFileset, options);
-      this._setStatus(MODEL_STATUS.READY, 'Model ready — on-device inference active');
+      this.conversation = await this._createConversation();
+      this._setStatus(MODEL_STATUS.READY, 'Model ready - LiteRT LM on-device inference active');
     } catch (err) {
       console.error('[AIEngine] Load error:', err);
       this._setStatus(MODEL_STATUS.ERROR, `Failed: ${err.message}`);
@@ -144,41 +219,62 @@ class AIEngine {
     }
   }
 
+  _chunkText(chunk) {
+    if (!chunk) return '';
+    if (typeof chunk.content === 'string') return chunk.content;
+    if (!Array.isArray(chunk.content)) return '';
+
+    return chunk.content
+      .filter(item => item && item.type === 'text' && typeof item.text === 'string')
+      .map(item => item.text)
+      .join('');
+  }
+
+  async _streamMessage(conversation, message, onToken) {
+    let fullResponse = '';
+    const stream = conversation.sendMessageStreaming(message);
+
+    for await (const chunk of stream) {
+      const text = this._chunkText(chunk);
+      if (!text) continue;
+      fullResponse += text;
+      if (onToken) onToken(fullResponse);
+    }
+
+    return fullResponse;
+  }
+
+  _messagesFromGemmaTranscript(rawPrompt) {
+    const turnRegex = /<start_of_turn>(user|model)\n([\s\S]*?)(?:<end_of_turn>|$)/g;
+    const messages = [];
+    let match;
+
+    while ((match = turnRegex.exec(rawPrompt)) !== null) {
+      const role = match[1] === 'model' ? 'assistant' : 'user';
+      const content = match[2].trim();
+      if (!content) continue;
+      messages.push({ role, content });
+    }
+
+    return messages.length ? messages : rawPrompt;
+  }
+
   /**
-   * Generate a response (streaming).
+   * Generate a response in the main chat conversation.
    * @param {string} prompt
-   * @param {(partial: string) => void} onToken - called with each partial result
+   * @param {(partial: string) => void} onToken - called with accumulated text
    * @returns {Promise<string>} full response
    */
   async generate(prompt, onToken) {
-    if (!this.llmInference) {
+    if (!this.conversation) {
       throw new Error('Model not loaded');
     }
 
-    this._setStatus(MODEL_STATUS.GENERATING, 'Generating…');
+    this._setStatus(MODEL_STATUS.GENERATING, 'Generating...');
 
     try {
-      // Format as instruction-tuned prompt
-      const formattedPrompt = this._formatPrompt(prompt);
-
-      let fullResponse = '';
-
-      // Use streaming API
-      const response = await this.llmInference.generateResponse(
-        formattedPrompt,
-        (partialResult, done) => {
-          fullResponse = partialResult;
-          if (onToken) onToken(partialResult);
-        }
-      );
-
-      // If streaming callback didn't fire, use direct result
-      if (!fullResponse && response) {
-        fullResponse = response;
-        if (onToken) onToken(response);
-      }
-
-      this._setStatus(MODEL_STATUS.READY, 'Model ready — on-device inference active');
+      const fullResponse = await this._streamMessage(this.conversation, prompt, onToken);
+      this._setStatus(MODEL_STATUS.READY, 'Model ready - LiteRT LM on-device inference active');
       return fullResponse;
     } catch (err) {
       console.error('[AIEngine] Generation error:', err);
@@ -188,44 +284,31 @@ class AIEngine {
   }
 
   /**
-   * Generate a response using raw formatted string (for multi-turn/agents).
+   * Generate a response using a raw formatted string for the agent loop.
    */
   async generateRaw(rawPrompt, onToken) {
-    if (!this.llmInference) throw new Error('Model not loaded');
-    this._setStatus(MODEL_STATUS.GENERATING, 'Agent thinking…');
+    if (!this.engine) {
+      throw new Error('Model not loaded');
+    }
 
+    this._setStatus(MODEL_STATUS.GENERATING, 'Agent thinking...');
+
+    let conversation = null;
     try {
-      let fullResponse = '';
-      const response = await this.llmInference.generateResponse(
-        rawPrompt,
-        (partialResult, done) => {
-          fullResponse = partialResult;
-          if (onToken) onToken(partialResult);
-        }
-      );
-      if (!fullResponse && response) {
-        fullResponse = response;
-        if (onToken) onToken(response);
-      }
-      this._setStatus(MODEL_STATUS.READY, 'Model ready — on-device inference active');
+      conversation = await this._createConversation();
+      const message = this._messagesFromGemmaTranscript(rawPrompt);
+      const fullResponse = await this._streamMessage(conversation, message, onToken);
+      this._setStatus(MODEL_STATUS.READY, 'Model ready - LiteRT LM on-device inference active');
       return fullResponse;
     } catch (err) {
       console.error('[AIEngine] Raw generation error:', err);
       this._setStatus(MODEL_STATUS.READY, 'Generation completed with errors');
       throw err;
+    } finally {
+      if (conversation) {
+        await conversation.delete();
+      }
     }
-  }
-
-  /**
-   * Format prompt using instruction template.
-   */
-  _formatPrompt(userMessage) {
-    return `<start_of_turn>user
-You are an expert coding assistant inside an IDE. Provide concise, correct code and explanations. Use markdown code blocks for code snippets.
-
-${userMessage}<end_of_turn>
-<start_of_turn>model
-`;
   }
 
   get isReady() {
@@ -246,22 +329,38 @@ ${userMessage}<end_of_turn>
     try {
       const filename = url.split('/').pop();
 
-      // Check cache first if persist is requested
       if (persist) {
         const cached = await this.getCachedModel(filename);
         if (cached) {
-          this._setStatus(MODEL_STATUS.LOADING, 'Loading from local disk…');
-          await this.loadModel(cached);
-          return;
+          this._setStatus(MODEL_STATUS.LOADING, 'Loading from local disk...');
+          try {
+            await this.loadModel(cached);
+            return;
+          } catch (err) {
+            await this.deleteFromCache(filename);
+            console.warn('[AIEngine] Removed corrupt cached model:', err);
+            this._setStatus(MODEL_STATUS.DOWNLOADING, 'Cached model was corrupt. Downloading again...');
+          }
         }
       }
 
-      this._setStatus(MODEL_STATUS.DOWNLOADING, 'Connecting…');
+      this._setStatus(MODEL_STATUS.DOWNLOADING, 'Connecting...');
 
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
 
       const total = parseInt(response.headers.get('content-length') || '0');
+
+      if (persist) {
+        const file = await this.saveResponseToCache(filename, response, onProgress);
+        await this.loadModel(file);
+        return;
+      }
+
+      if (total > MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES) {
+        throw new Error('This model is too large for memory-only loading. Enable "Save to local disk (OPFS)" and try again.');
+      }
+
       const reader = response.body.getReader();
       const chunks = [];
       let received = 0;
@@ -269,18 +368,23 @@ ${userMessage}<end_of_turn>
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
+        if (received + value.length > MODEL_DOWNLOAD_MEMORY_LIMIT_BYTES) {
+          await reader.cancel();
+          throw new Error('This model is too large for memory-only loading. Enable "Save to local disk (OPFS)" and try again.');
+        }
+
         chunks.push(value);
         received += value.length;
         if (onProgress) onProgress(received, total);
         this._setStatus(
           MODEL_STATUS.DOWNLOADING,
           total
-            ? `Downloading… ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`
-            : `Downloading… ${(received / 1048576).toFixed(0)} MB`
+            ? `Downloading... ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`
+            : `Downloading... ${(received / 1048576).toFixed(0)} MB`
         );
       }
 
-      // Concatenate chunks into a single buffer
       const buffer = new Uint8Array(received);
       let offset = 0;
       for (const chunk of chunks) {
@@ -290,10 +394,6 @@ ${userMessage}<end_of_turn>
 
       const file = new File([buffer], filename);
 
-      if (persist) {
-        await this.saveToCache(filename, buffer);
-      }
-
       await this.loadModel(file);
     } catch (err) {
       console.error('[AIEngine] Download error:', err);
@@ -302,12 +402,16 @@ ${userMessage}<end_of_turn>
     }
   }
 
-  dispose() {
-    if (this.llmInference) {
-      this.llmInference.close();
-      this.llmInference = null;
-    }
+  async disposeAsync() {
+    await this._deleteEngine();
     this._setStatus(MODEL_STATUS.IDLE, 'Engine disposed');
+  }
+
+  dispose() {
+    this._setStatus(MODEL_STATUS.IDLE, 'Engine disposed');
+    this._deleteEngine().catch(err => {
+      console.error('[AIEngine] Dispose error:', err);
+    });
   }
 }
 

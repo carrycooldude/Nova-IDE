@@ -17,7 +17,7 @@ const FeatureList = [
     icon: '🧠',
     description: (
       <>
-        Powered by the cutting-edge WebGPU backend and MediaPipe, execute your agent's reasoning loops completely client-side without API keys.
+        Powered by the cutting-edge WebGPU backend and LiteRT LM, execute your agent's reasoning loops completely client-side without API keys.
       </>
     ),
   },
