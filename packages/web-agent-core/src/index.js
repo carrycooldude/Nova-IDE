@@ -1,12 +1,4 @@
 export class WebAgent {
-  /**
-   * @param {Object} config
-   * @param {Object} config.llmEngine - Engine with a generateRaw(history, callback) method
-   * @param {Array} config.tools - Array of tool definitions { name, description, usage, execute(args) }
-   * @param {Function} config.onUpdate - Callback for UI updates
-   * @param {string} config.systemPrompt - Additional context for the system prompt
-   * @param {number} config.maxSteps - Maximum ReAct loops
-   */
   constructor(config) {
     this.llm = config.llmEngine;
     this.tools = config.tools || [];
@@ -16,49 +8,44 @@ export class WebAgent {
   }
 
   _buildSystemPrompt() {
-    let toolDocs = this.tools.map((t, index) => `
-${index + 1}. ${t.name}
-${t.description}
+    const toolDocs = this.tools.map((tool, index) => `
+${index + 1}. ${tool.name}
+${tool.description}
 Usage format:
 <tool_call>
-<name>${t.name}</name>
-${t.usage}
+<name>${tool.name}</name>
+${tool.usage}
 </tool_call>`).join('\n');
 
-    return `You are an autonomous AI agent running inside a local browser environment.
-You must use a step-by-step approach: Reason, then Act.
+    return `You are an autonomous coding agent running inside a local IDE.
+You must use tools for workspace inspection and file changes.
 
 ${this.systemPrompt}
 
-Here are the tools available to you:
+Available tools:
 ${toolDocs}
 
-INSTRUCTIONS:
-- You MUST use the exact <tool_call> XML format shown above to take an action.
-- You can only use ONE tool per response.
-- BE EXTREMELY CONCISE. Keep your reasoning to 1-2 sentences maximum before calling a tool. Do not write long paragraphs of analysis.
-- After you output a <tool_call>, STOP generating. The system will execute the tool and provide you with the <tool_result>.`;
+Tool protocol:
+- You MUST output exactly one <tool_call> XML block when taking an action.
+- Do not wrap tool calls in markdown.
+- Use list_files or search_workspace before read_file unless the exact file path is already known.
+- Use finish when the task is complete.
+- Keep reasoning to one short sentence before the tool call.`;
   }
 
   _parseToolCall(text) {
-    // Very flexible regex that matches the tool call XML block and extracts any inner tags dynamically
     const toolRegex = /<tool_call>([\s\S]*?)<\/tool_call>/i;
-    const match = text.match(toolRegex);
+    const match = String(text || '').match(toolRegex);
     if (!match) return null;
 
-    const innerXml = match[1];
     const args = {};
-    
-    // Extract all top-level tags like <name>, <path>, <content>, etc.
     const tagRegex = /<([a-zA-Z0-9_-]+)>([\s\S]*?)<\/\1>/g;
     let tagMatch;
-    while ((tagMatch = tagRegex.exec(innerXml)) !== null) {
+    while ((tagMatch = tagRegex.exec(match[1])) !== null) {
       args[tagMatch[1].trim()] = tagMatch[2].trim();
     }
 
-    if (!args.name) return null;
-
-    return args;
+    return args.name ? args : null;
   }
 
   async _executeTool(args) {
@@ -72,23 +59,17 @@ INSTRUCTIONS:
     }
   }
 
-  /**
-   * Run the autonomous ReAct loop
-   * @param {string} userTask 
-   */
   async run(userTask) {
     let history = `<start_of_turn>user\n${this._buildSystemPrompt()}\n\nTask: ${userTask}<end_of_turn>\n`;
     let stepCount = 0;
+    let invalidToolResponses = 0;
 
     while (stepCount < this.maxSteps) {
       stepCount++;
-      this.ui({ type: 'status', message: `Agent Thinking (Step ${stepCount})...` });
+      this.ui({ type: 'status', message: `Agent thinking (step ${stepCount})...` });
 
-      // Start Model Turn
       history += `<start_of_turn>model\n`;
       let currentResponse = '';
-
-      // Generate response from local LLM
       await this.llm.generateRaw(history, (partial) => {
         currentResponse = partial;
         this.ui({ type: 'token', text: partial });
@@ -96,32 +77,33 @@ INSTRUCTIONS:
 
       history += `${currentResponse}<end_of_turn>\n`;
 
-      // Check for tool calls
       const toolCall = this._parseToolCall(currentResponse);
-      
       if (!toolCall) {
-        this.ui({ type: 'system', message: `⚠️ Agent didn't call a tool. Reminding it to act or finish.` });
-        history += `<start_of_turn>user\nPlease use a <tool_call> XML block to take action, or use the 'finish' tool if you are done.<end_of_turn>\n`;
+        invalidToolResponses++;
+        this.ui({ type: 'system', message: 'Agent did not call a tool. Retrying with stricter instructions.' });
+        if (invalidToolResponses >= 2) {
+          this.ui({ type: 'agent_fallback', reason: 'tool_format_failed', lastResponse: currentResponse });
+          break;
+        }
+        history += `<start_of_turn>user\nYour previous response did not contain a valid tool call. Output exactly one <tool_call> block now. Use search_workspace if you need to find something.<end_of_turn>\n`;
         continue;
       }
 
+      invalidToolResponses = 0;
       this.ui({ type: 'tool_call', tool: toolCall });
 
       if (toolCall.name === 'finish') {
-        this.ui({ type: 'system', message: `✅ Agent finished the task.` });
+        this.ui({ type: 'system', message: 'Agent finished the task.' });
         break;
       }
 
-      // Execute Tool
       const result = await this._executeTool(toolCall);
-      this.ui({ type: 'tool_result', result: result, tool: toolCall });
-
-      // Append result to history for next turn
-      history += `<start_of_turn>user\n<tool_result>\n${result}\n</tool_result>\n\nAnalyze the result and take your next step using a <tool_call> block.<end_of_turn>\n`;
+      this.ui({ type: 'tool_result', result, tool: toolCall });
+      history += `<start_of_turn>user\n<tool_result>\n${result}\n</tool_result>\n\nUse the result to take the next step with exactly one <tool_call> block.<end_of_turn>\n`;
     }
 
     if (stepCount >= this.maxSteps) {
-      this.ui({ type: 'system', message: `🛑 Agent stopped (max steps reached).` });
+      this.ui({ type: 'system', message: 'Agent stopped because it reached the max step count.' });
     }
   }
 }

@@ -1,5 +1,5 @@
 /**
- * terminal.js — Simulated terminal with basic JS evaluation.
+ * terminal.js - Simulated environment panel with browser/runtime diagnostics.
  */
 
 export class Terminal {
@@ -9,14 +9,12 @@ export class Terminal {
     this.historyIndex = -1;
     this.render();
     this._bindEvents();
-    this._print('Nova IDE Terminal v1.0', 'success');
-    this._print('Type "help" for available commands.\n');
+    this._print('Nova IDE Environment Panel v1.0', 'success');
+    this._print('This is a simulated environment panel, not a real shell. Type "help" for available commands.\n');
   }
 
   render() {
-    this.container.innerHTML = `
-      <div class="terminal" id="terminal-output"></div>
-    `;
+    this.container.innerHTML = `<div class="terminal" id="terminal-output"></div>`;
     this._addPrompt();
   }
 
@@ -25,21 +23,18 @@ export class Terminal {
     const line = document.createElement('div');
     line.className = 'terminal__line';
     line.innerHTML = `
-      <span class="terminal__prompt">❯</span>
-      <input class="terminal__input" id="terminal-input" type="text" 
+      <span class="terminal__prompt">&gt;</span>
+      <input class="terminal__input" id="terminal-input" type="text"
         spellcheck="false" autocomplete="off" autofocus>
     `;
     output.appendChild(line);
-
-    const input = line.querySelector('#terminal-input');
-    input.focus();
+    line.querySelector('#terminal-input').focus();
     this._scrollToBottom();
   }
 
   _bindEvents() {
     this.container.addEventListener('click', () => {
-      const input = this.container.querySelector('#terminal-input');
-      if (input) input.focus();
+      this.container.querySelector('#terminal-input')?.focus();
     });
 
     this.container.addEventListener('keydown', (e) => {
@@ -88,41 +83,36 @@ export class Terminal {
       case 'help':
         this._print([
           'Available commands:',
-          '  help          — Show this help',
-          '  clear         — Clear terminal',
-          '  echo <text>   — Print text',
-          '  date          — Show current date/time',
-          '  env           — Show environment info',
-          '  eval <expr>   — Evaluate JavaScript',
-          '  model         — Show AI model status',
-          '  version       — Show IDE version',
+          '  help          - Show this help',
+          '  clear         - Clear panel',
+          '  echo <text>   - Print text',
+          '  date          - Show current date/time',
+          '  env           - Show environment info',
+          '  eval <expr>   - Evaluate JavaScript',
+          '  model         - Show AI model status',
+          '  version       - Show IDE version',
         ].join('\n'));
         break;
-
       case 'clear':
         this.container.querySelector('#terminal-output').innerHTML = '';
         this._addPrompt();
         return;
-
       case 'echo':
         this._print(parts.slice(1).join(' '));
         break;
-
       case 'date':
         this._print(new Date().toString());
         break;
-
       case 'env':
         this._print([
           `Platform:  ${navigator.platform}`,
-          `UserAgent: ${navigator.userAgent.slice(0, 80)}…`,
-          `WebGPU:    ${navigator.gpu ? '✅ Available' : '❌ Not available'}`,
-          `Memory:    ${navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'Unknown'}`,
+          `UserAgent: ${navigator.userAgent.slice(0, 80)}...`,
+          `WebGPU:    ${navigator.gpu ? 'Available' : 'Not available'}`,
+          `Memory:    ${navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Unknown'}`,
           `Cores:     ${navigator.hardwareConcurrency || 'Unknown'}`,
           `Language:  ${navigator.language}`,
         ].join('\n'));
         break;
-
       case 'eval':
         try {
           const expr = parts.slice(1).join(' ');
@@ -132,15 +122,12 @@ export class Terminal {
           this._print(`Error: ${err.message}`, 'error');
         }
         break;
-
       case 'model':
-        this._print('Use the AI panel (right side) to load and interact with the model.');
+        this._print('Use the AI panel to load LiteRT LM and inspect model status.');
         break;
-
       case 'version':
-        this._print('Nova IDE v1.0.0\nPowered by Local AI', 'success');
+        this._print('Nova IDE v1.0.0\nPowered by LiteRT LM and WebGPU', 'success');
         break;
-
       default:
         this._print(`Command not found: ${command}. Type "help" for available commands.`, 'error');
     }
